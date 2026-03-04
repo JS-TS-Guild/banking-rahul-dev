@@ -16,6 +16,7 @@ export default class TransactionService {
 
     const sourceBankId = fromBankId;
     const targetBankId = toBankId ?? fromBankId;
+    const isSelfTransfer = fromUserId === toUserId;
 
     const fromUser = GlobalRegistry.getUser(fromUserId);
     const toUser = GlobalRegistry.getUser(toUserId);
@@ -25,10 +26,24 @@ export default class TransactionService {
     GlobalRegistry.getBank(targetBankId);
 
     const sourceAccount = this.pickSourceAccount(fromUser.getAccountIds(), sourceBankId, amount);
-    const targetAccount = this.pickTargetAccount(toUser.getAccountIds(), targetBankId);
+    const targetAccount = this.pickTargetAccount(
+      toUser.getAccountIds(),
+      targetBankId,
+      isSelfTransfer ? sourceAccount.getId() : undefined
+    );
 
     sourceAccount.debit(amount);
     targetAccount.credit(amount);
+  }
+
+  static send(
+    fromBankId: BankId,
+    fromUserId: UserId,
+    toUserId: UserId,
+    amount: number,
+    toBankId?: BankId
+  ): void {
+    this.transfer(fromBankId, fromUserId, toUserId, amount, toBankId);
   }
 
   private static pickSourceAccount(
@@ -49,10 +64,14 @@ export default class TransactionService {
     throw new Error('Insufficient funds');
   }
 
-  private static pickTargetAccount(accountIds: string[], targetBankId: BankId): BankAccount {
+  private static pickTargetAccount(
+    accountIds: string[],
+    targetBankId: BankId,
+    excludedAccountId?: string
+  ): BankAccount {
     for (const accountId of accountIds) {
       const account = GlobalRegistry.getAccount(accountId);
-      if (account.getBankId() === targetBankId) {
+      if (account.getBankId() === targetBankId && account.getId() !== excludedAccountId) {
         return account;
       }
     }

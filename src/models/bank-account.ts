@@ -65,4 +65,12 @@ export default class BankAccount {
     }
     this.balance -= amount;
   }
+
+  deposit(amount: number): void {
+    this.credit(amount);
+  }
+
+  withdraw(amount: number): void {
+    this.debit(amount);
+  }
 }

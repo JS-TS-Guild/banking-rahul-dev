@@ -48,4 +48,8 @@ export default class Bank {
   send(fromUserId: UserId, toUserId: UserId, amount: number, toBankId?: BankId): void {
     TransactionService.transfer(this.id, fromUserId, toUserId, amount, toBankId);
   }
+
+  transfer(fromUserId: UserId, toUserId: UserId, amount: number, toBankId?: BankId): void {
+    this.send(fromUserId, toUserId, amount, toBankId);
+  }
 }

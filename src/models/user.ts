@@ -30,4 +30,8 @@ export default class User {
   getAccountIds(): BankAccountId[] {
     return [...this.accountIds];
   }
+
+  getAccounts(): BankAccountId[] {
+    return this.getAccountIds();
+  }
 }

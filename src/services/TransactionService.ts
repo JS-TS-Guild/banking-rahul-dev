@@ -25,14 +25,14 @@ export default class TransactionService {
     GlobalRegistry.getBank(sourceBankId);
     GlobalRegistry.getBank(targetBankId);
 
-    const sourceAccount = this.pickSourceAccount(fromUser.getAccountIds(), sourceBankId, amount);
+    const sourceAccounts = this.pickSourceAccounts(fromUser.getAccountIds(), sourceBankId);
     const targetAccount = this.pickTargetAccount(
       toUser.getAccountIds(),
       targetBankId,
-      isSelfTransfer ? sourceAccount.getId() : undefined
+      isSelfTransfer ? sourceAccounts[0]?.getId() : undefined
     );
 
-    sourceAccount.debit(amount);
+    this.debitAcrossAccounts(sourceAccounts, amount);
     targetAccount.credit(amount);
   }
 
@@ -46,22 +46,60 @@ export default class TransactionService {
     this.transfer(fromBankId, fromUserId, toUserId, amount, toBankId);
   }
 
-  private static pickSourceAccount(
-    accountIds: string[],
-    sourceBankId: BankId,
-    amount: number
-  ): BankAccount {
+  private static pickSourceAccounts(accountIds: string[], sourceBankId: BankId): BankAccount[] {
     const sourceAccounts = accountIds
       .map((accountId) => GlobalRegistry.getAccount(accountId))
       .filter((account) => account.getBankId() === sourceBankId);
 
+    if (sourceAccounts.length === 0) {
+      throw new Error('Insufficient funds');
+    }
+
+    return sourceAccounts;
+  }
+
+  private static debitAcrossAccounts(sourceAccounts: BankAccount[], amount: number): void {
+    let remaining = amount;
+
     for (const account of sourceAccounts) {
-      if (account.canDebit(amount)) {
-        return account;
+      if (remaining <= 0) {
+        break;
+      }
+
+      if (account.canDebit(remaining)) {
+        remaining = 0;
+        continue;
+      }
+
+      const available = account.getBalance();
+      if (available > 0) {
+        remaining -= Math.min(available, remaining);
       }
     }
 
-    throw new Error('Insufficient funds');
+    if (remaining > 0) {
+      throw new Error('Insufficient funds');
+    }
+
+    remaining = amount;
+    for (const account of sourceAccounts) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      if (account.canDebit(remaining)) {
+        account.debit(remaining);
+        remaining = 0;
+        break;
+      }
+
+      const available = account.getBalance();
+      if (available > 0) {
+        const debitAmount = Math.min(available, remaining);
+        account.debit(debitAmount);
+        remaining -= debitAmount;
+      }
+    }
   }
 
   private static pickTargetAccount(
